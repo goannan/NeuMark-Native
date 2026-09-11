@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VALL-E Native Watermarking: Robust In-Model Latent Watermarking for Generative Speech Synthesis</title>
+    
+    <!-- Fonts & Styles -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --primary-dark: #1558b0;
+            --primary-light: #e8f0fe;
+            --accent-gradient: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%);
+            --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            --card-hover: 0 8px 30px rgba(0, 0, 0, 0.09);
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --bg-color: #f8fafc;
+            --text-dark: #1e293b;
+            --text-muted: #64748b;
+        }
+
+        body {
+            font-family: "Google Sans", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        .hero-card {
+            background: #ffffff;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--card-shadow);
+            padding: 2.75rem 2.25rem;
+            margin-top: 2.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid #edf2f7;
+            text-align: center;
+        }
+
+        .publication-title {
+            font-family: "Google Sans", sans-serif;
+            font-weight: 700;
+            color: #0f172a;
+            line-height: 1.3;
+        }
+
+        .publication-title .highlight {
+            color: var(--primary);
+        }
+
+        .author-block {
+            font-size: 1.15rem;
+            color: var(--text-dark);
+            margin-top: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .btn-academic {
+            border-radius: 9999px;
+            font-weight: 600;
+            padding: 0.6rem 1.4rem;
+            transition: all 0.2s ease-in-out;
+            font-size: 0.95rem;
+        }
+
+        .btn-academic:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .content-card {
+            background: #ffffff;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--card-shadow);
+            padding: 2rem 2.25rem;
+            margin-bottom: 2rem;
+            border: 1px solid #edf2f7;
+            transition: box-shadow 0.25s ease;
+        }
+
+        .content-card:hover {
+            box-shadow: var(--card-hover);
+        }
+
+        .section-header {
+            font-weight: 700;
+            font-size: 1.45rem;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid #f1f5f9;
+        }
+
+        .section-header i {
+            color: var(--primary);
+            margin-right: 0.75rem;
+        }
+
+        .sample-badge {
+            background: var(--primary-light);
+            color: var(--primary);
+            font-weight: 700;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            margin-left: 0.75rem;
+        }
+
+        /* Audio comparison table */
+        .comparison-table {
+            width: 100%;
+            margin-bottom: 0;
+            border-collapse: separate;
+            border-spacing: 0;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+
+        .comparison-table thead th {
+            background: #f1f5f9;
+            color: #334155;
+            font-weight: 600;
+            text-align: center;
+            vertical-align: middle;
+            border-bottom: 2px solid #cbd5e1;
+            padding: 0.9rem 0.75rem;
+            font-size: 0.95rem;
+        }
+
+        .comparison-table tbody td {
+            vertical-align: middle;
+            text-align: center;
+            padding: 0.85rem 0.6rem;
+            border-bottom: 1px solid #e2e8f0;
+            background-color: #ffffff;
+        }
+
+        .row-proposed {
+            background-color: #f0f7ff !important;
+        }
+
+        .row-proposed td {
+            background-color: #f0f7ff !important;
+            font-weight: 600;
+        }
+
+        .badge-ours {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #ffffff;
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            margin-left: 0.4rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            vertical-align: middle;
+        }
+
+        audio {
+            width: 250px;
+            height: 38px;
+            outline: none;
+            border-radius: 20px;
+        }
+
+        .dataset-pill {
+            display: inline-block;
+            padding: 0.35rem 1rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-right: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .dataset-pill-libri {
+            background: #ede9fe;
+            color: #6d28d9;
+        }
+
+        .dataset-pill-seed {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+
+        .nav-pills-custom .nav-link {
+            border-radius: 9999px;
+            font-weight: 600;
+            padding: 0.5rem 1.5rem;
+            color: var(--text-muted);
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            margin-right: 0.75rem;
+            transition: all 0.2s ease;
+        }
+
+        .nav-pills-custom .nav-link.active {
+            background: var(--primary);
+            color: #ffffff;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(26, 115, 232, 0.25);
+        }
+
+        footer {
+            text-align: center;
+            padding: 3rem 0;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container pb-5">
+    <main role="main">
+
+        <!-- Title & Authors Card -->
+        <div class="hero-card">
+            <h1 class="publication-title is-size-2">
+                <span class="highlight">VALL-E Native Watermarking</span>
+            </h1>
+            <h3 class="publication-title is-size-4 mt-2 font-weight-normal text-muted">
+                Robust In-Model Latent Audio Watermarking for Generative Neural Speech Synthesis
+            </h3>
+            
+            <div class="author-block">
+                <span><i class="fa-solid fa-user-pen mr-2"></i><b>Author:</b> Annan Wu</span>
+            </div>
+
+            <div class="d-flex justify-content-center flex-wrap" style="gap: 12px;">
+                <a href="https://github.com/goannan/NeuMark-Native" target="_blank" class="btn btn-dark btn-academic">
+                    <i class="fab fa-github mr-2"></i>Code (NeuMark-Native)
+                </a>
+            </div>
+        </div>
+
+        <!-- Abstract Card -->
+        <div class="content-card">
+            <div class="section-header">
+                <i class="fas fa-file-alt"></i>Abstract & Overview
+            </div>
+            <div class="content text-justify" style="font-size: 1.05rem; color: #334155;">
+                <p>
+                    Generative speech synthesis models (such as neural codec language models like <strong>VALL-E</strong>) achieve unprecedented zero-shot voice cloning capabilities, posing substantial safety and copyright traceability challenges. Traditional post-processing audio watermarks (e.g., AudioSeal, WavMark) degrade perceptual speech quality or are vulnerable to neural codec compression and acoustic perturbations.
+                </p>
+                <p>
+                    In this project, we propose <strong>VALL-E Native Latent Watermarking</strong>, embedding covert, multi-bit cryptographic watermark representations directly into the discrete latent acoustic space and residual quantization representations during generative synthesis. By jointly conditioning on native speech tokens and energy-gated differentiable distortion channels, our approach preserves pristine acoustic fidelity and natural prosody while guaranteeing robust watermark extraction across diverse acoustic environments.
+                </p>
+            </div>
+        </div>
+
+        <!-- Section Navigation -->
+        <div class="d-flex justify-content-center mb-4">
+            <ul class="nav nav-pills nav-pills-custom" id="datasetTabs" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="libritts-tab" data-toggle="pill" href="#libritts-content" role="tab">
+                        <i class="fa-solid fa-microphone mr-2"></i>LibriTTS Evaluation
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="seedtts-tab" data-toggle="pill" href="#seedtts-content" role="tab">
+                        <i class="fa-solid fa-bolt mr-2"></i>SeedTTS Evaluation
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Tab Contents -->
+        <div class="tab-content" id="datasetTabsContent">
+            
+            <!-- ============================================================== -->
+            <!-- 1. LibriTTS Content -->
+            <!-- ============================================================== -->
+            <div class="tab-pane fade show active" id="libritts-content" role="tabpanel">
+                <div class="mb-3 text-center">
+                    <span class="dataset-pill dataset-pill-libri">
+                        <i class="fa-solid fa-database mr-1"></i> LibriTTS Test-Clean Zero-Shot Synthesis
+                    </span>
+                    <p class="text-muted small">Comparative evaluation across 5 watermarking algorithms under LibriTTS acoustic prompts.</p>
+                </div>
+
+                <!-- LibriTTS Sample 1 -->
+                <div class="content-card">
+                    <div class="section-header">
+                        <i class="fa-solid fa-waveform-lines"></i>LibriTTS — Sample 1
+                        <span class="sample-badge">LibriTTS-01</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table comparison-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 22%;">System / Model</th>
+                                    <th style="width: 26%;">Prompt (Reference)</th>
+                                    <th style="width: 26%;">Clean TTS (VALL-E)</th>
+                                    <th style="width: 26%;">Watermarked Audio</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="row-proposed">
+                                    <td>
+                                        <strong>Proposed</strong>
+                                        <span class="badge-ours">Ours</span>
+                                    </td>
+                                    <td><audio src="audio/libritts_sample_1/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_1/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_1/02_wm_proposed.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>NeuMark</strong></td>
+                                    <td><audio src="audio/libritts_sample_1/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_1/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_1/02_wm_neumark.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>AudioSeal</strong></td>
+                                    <td><audio src="audio/libritts_sample_1/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_1/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_1/02_wm_audioseal.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>TraceableSpeech</strong></td>
+                                    <td><audio src="audio/libritts_sample_1/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_1/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_1/02_wm_traceablespeech.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>WavMark</strong></td>
+                                    <td><audio src="audio/libritts_sample_1/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_1/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_1/02_wm_wavmark.wav" controls></audio></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- LibriTTS Sample 2 -->
+                <div class="content-card">
+                    <div class="section-header">
+                        <i class="fa-solid fa-waveform-lines"></i>LibriTTS — Sample 2
+                        <span class="sample-badge">LibriTTS-02</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table comparison-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 22%;">System / Model</th>
+                                    <th style="width: 26%;">Prompt (Reference)</th>
+                                    <th style="width: 26%;">Clean TTS (VALL-E)</th>
+                                    <th style="width: 26%;">Watermarked Audio</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="row-proposed">
+                                    <td>
+                                        <strong>Proposed</strong>
+                                        <span class="badge-ours">Ours</span>
+                                    </td>
+                                    <td><audio src="audio/libritts_sample_2/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_2/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_2/02_wm_proposed.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>NeuMark</strong></td>
+                                    <td><audio src="audio/libritts_sample_2/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_2/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_2/02_wm_neumark.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>AudioSeal</strong></td>
+                                    <td><audio src="audio/libritts_sample_2/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_2/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_2/02_wm_audioseal.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>TraceableSpeech</strong></td>
+                                    <td><audio src="audio/libritts_sample_2/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_2/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_2/02_wm_traceablespeech.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>WavMark</strong></td>
+                                    <td><audio src="audio/libritts_sample_2/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_2/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_2/02_wm_wavmark.wav" controls></audio></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- LibriTTS Sample 3 -->
+                <div class="content-card">
+                    <div class="section-header">
+                        <i class="fa-solid fa-waveform-lines"></i>LibriTTS — Sample 3
+                        <span class="sample-badge">LibriTTS-03</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table comparison-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 22%;">System / Model</th>
+                                    <th style="width: 26%;">Prompt (Reference)</th>
+                                    <th style="width: 26%;">Clean TTS (VALL-E)</th>
+                                    <th style="width: 26%;">Watermarked Audio</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="row-proposed">
+                                    <td>
+                                        <strong>Proposed</strong>
+                                        <span class="badge-ours">Ours</span>
+                                    </td>
+                                    <td><audio src="audio/libritts_sample_3/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_3/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_3/02_wm_proposed.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>NeuMark</strong></td>
+                                    <td><audio src="audio/libritts_sample_3/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_3/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_3/02_wm_neumark.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>AudioSeal</strong></td>
+                                    <td><audio src="audio/libritts_sample_3/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_3/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_3/02_wm_audioseal.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>TraceableSpeech</strong></td>
+                                    <td><audio src="audio/libritts_sample_3/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_3/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_3/02_wm_traceablespeech.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>WavMark</strong></td>
+                                    <td><audio src="audio/libritts_sample_3/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_3/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/libritts_sample_3/02_wm_wavmark.wav" controls></audio></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ============================================================== -->
+            <!-- 2. SeedTTS Content -->
+            <!-- ============================================================== -->
+            <div class="tab-pane fade" id="seedtts-content" role="tabpanel">
+                <div class="mb-3 text-center">
+                    <span class="dataset-pill dataset-pill-seed">
+                        <i class="fa-solid fa-seedling mr-1"></i> SeedTTS Cross-Domain Benchmark
+                    </span>
+                    <p class="text-muted small">Out-of-domain robustness evaluation under challenging conversational and expressive speech.</p>
+                </div>
+
+                <!-- SeedTTS Sample 1 -->
+                <div class="content-card">
+                    <div class="section-header">
+                        <i class="fa-solid fa-waveform-lines"></i>SeedTTS — Sample 1
+                        <span class="sample-badge">SeedTTS-01</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table comparison-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 22%;">System / Model</th>
+                                    <th style="width: 26%;">Prompt (Reference)</th>
+                                    <th style="width: 26%;">Clean TTS (VALL-E)</th>
+                                    <th style="width: 26%;">Watermarked Audio</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="row-proposed">
+                                    <td>
+                                        <strong>Proposed</strong>
+                                        <span class="badge-ours">Ours</span>
+                                    </td>
+                                    <td><audio src="audio/seedtts_sample_1/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_1/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_1/02_wm_proposed.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>NeuMark</strong></td>
+                                    <td><audio src="audio/seedtts_sample_1/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_1/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_1/02_wm_neumark.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>AudioSeal</strong></td>
+                                    <td><audio src="audio/seedtts_sample_1/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_1/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_1/02_wm_audioseal.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>TraceableSpeech</strong></td>
+                                    <td><audio src="audio/seedtts_sample_1/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_1/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_1/02_wm_traceablespeech.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>WavMark</strong></td>
+                                    <td><audio src="audio/seedtts_sample_1/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_1/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_1/02_wm_wavmark.wav" controls></audio></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- SeedTTS Sample 2 -->
+                <div class="content-card">
+                    <div class="section-header">
+                        <i class="fa-solid fa-waveform-lines"></i>SeedTTS — Sample 2
+                        <span class="sample-badge">SeedTTS-02</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table comparison-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 22%;">System / Model</th>
+                                    <th style="width: 26%;">Prompt (Reference)</th>
+                                    <th style="width: 26%;">Clean TTS (VALL-E)</th>
+                                    <th style="width: 26%;">Watermarked Audio</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="row-proposed">
+                                    <td>
+                                        <strong>Proposed</strong>
+                                        <span class="badge-ours">Ours</span>
+                                    </td>
+                                    <td><audio src="audio/seedtts_sample_2/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_2/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_2/02_wm_proposed.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>NeuMark</strong></td>
+                                    <td><audio src="audio/seedtts_sample_2/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_2/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_2/02_wm_neumark.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>AudioSeal</strong></td>
+                                    <td><audio src="audio/seedtts_sample_2/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_2/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_2/02_wm_audioseal.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>TraceableSpeech</strong></td>
+                                    <td><audio src="audio/seedtts_sample_2/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_2/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_2/02_wm_traceablespeech.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>WavMark</strong></td>
+                                    <td><audio src="audio/seedtts_sample_2/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_2/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_2/02_wm_wavmark.wav" controls></audio></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- SeedTTS Sample 3 -->
+                <div class="content-card">
+                    <div class="section-header">
+                        <i class="fa-solid fa-waveform-lines"></i>SeedTTS — Sample 3
+                        <span class="sample-badge">SeedTTS-03</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table comparison-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 22%;">System / Model</th>
+                                    <th style="width: 26%;">Prompt (Reference)</th>
+                                    <th style="width: 26%;">Clean TTS (VALL-E)</th>
+                                    <th style="width: 26%;">Watermarked Audio</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="row-proposed">
+                                    <td>
+                                        <strong>Proposed</strong>
+                                        <span class="badge-ours">Ours</span>
+                                    </td>
+                                    <td><audio src="audio/seedtts_sample_3/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_3/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_3/02_wm_proposed.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>NeuMark</strong></td>
+                                    <td><audio src="audio/seedtts_sample_3/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_3/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_3/02_wm_neumark.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>AudioSeal</strong></td>
+                                    <td><audio src="audio/seedtts_sample_3/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_3/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_3/02_wm_audioseal.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>TraceableSpeech</strong></td>
+                                    <td><audio src="audio/seedtts_sample_3/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_3/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_3/02_wm_traceablespeech.wav" controls></audio></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>WavMark</strong></td>
+                                    <td><audio src="audio/seedtts_sample_3/00_prompt.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_3/01_clean_tts.wav" controls></audio></td>
+                                    <td><audio src="audio/seedtts_sample_3/02_wm_wavmark.wav" controls></audio></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <footer>
+        <p>&copy; 2026 VALL-E Native Watermarking Demo Page. Hosted on GitHub Pages.</p>
+    </footer>
+</div>
+
+<!-- Scripts: jQuery & Bootstrap for tab switching -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Exclusive Audio Playback script -->
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const audios = document.querySelectorAll("audio");
+        audios.forEach(audio => {
+            audio.addEventListener("play", () => {
+                audios.forEach(otherAudio => {
+                    if (otherAudio !== audio && !otherAudio.paused) {
+                        otherAudio.pause();
+                    }
+                });
+            });
+        });
+    });
+</script>
+
+</body>
+</html>
