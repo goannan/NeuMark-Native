@@ -1,0 +1,39 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment
+.venv/
+venv/
+ENV/
+.python-version
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+
+# Large Checkpoints & Weights
+*.pt
+*.pth
+*.ckpt
+*.bin
+checkpoints/
+models/*.pth
+STmodels/pretrained_model/*.pt
+
+# Training outputs & logs
+exp/
+exp*/
+logs/
+*.log
+*.out
+*.err
+
+# Large data manifests & archives
+data/*.tar.gz
+data/*.jsonl.gz
+data/*.h5
+data/tokenized*

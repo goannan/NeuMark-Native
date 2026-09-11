@@ -1,0 +1,23 @@
+# Core Deep Learning
+torch>=2.0.0
+torchaudio>=2.0.0
+accelerate>=0.20.0
+tensorboard>=2.12.0
+
+# Audio Processing & Codec
+julius>=0.2.7
+librosa>=0.10.0
+soundfile>=0.12.1
+scipy>=1.10.0
+h5py>=3.8.0
+
+# Manifests & Data
+lhotse>=1.20.0
+tqdm>=4.65.0
+
+# Evaluation Metrics
+pesq>=0.0.4
+pystoi>=0.3.3
+
+# Optional Speech Codec
+speechtokenizer>=0.1.2
