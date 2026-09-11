@@ -4,15 +4,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
-CONFIG_PATH="${1:-configs/config_tts_native_energy_gated.json}"
+CONFIG_PATH="${1:-configs/config_tts_native.json}"
 CUDA_DEVICES="${CUDA_VISIBLE_DEVICES:-}"
 
 echo "=========================================================="
-echo " NeuMark-Native: Energy-Gated Watermark Training"
+echo " NeuMark-Native: TTS-Native Watermark Training"
 echo " Time:        $(date)"
-echo " Host:        $(hostname)"
 echo " Config:      ${CONFIG_PATH}"
-echo " Python:      $(which python3)"
 echo "=========================================================="
 
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
@@ -34,18 +32,16 @@ fi
 echo " Using ${NUM_GPUS} GPU(s)..."
 
 if [ "${NUM_GPUS}" -gt 1 ]; then
-    echo " Launching Multi-GPU DDP training with Accelerate..."
     accelerate launch \
         --multi_gpu \
         --num_processes "${NUM_GPUS}" \
         --mixed_precision bf16 \
         --dynamo_backend no \
-        tts_native_energy_gated_train.py --config "${CONFIG_PATH}"
+        tts_native_train.py --config "${CONFIG_PATH}"
 else
-    echo " Launching Single-GPU training with Accelerate..."
     accelerate launch \
         --num_processes 1 \
         --mixed_precision bf16 \
         --dynamo_backend no \
-        tts_native_energy_gated_train.py --config "${CONFIG_PATH}"
+        tts_native_train.py --config "${CONFIG_PATH}"
 fi

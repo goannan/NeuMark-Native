@@ -4,14 +4,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
-MANIFEST_PATH="${1:-data/cuts_test_valle_native.jsonl.gz}"
+MANIFEST_PATH="${1:-data/tokenized_valle_native/cuts_test_valle_native.jsonl.gz}"
 CKPT_PATH="${2:-checkpoints/NeuMark_native_latest.pt}"
 OUTPUT_DIR="${3:-exp/eval_results}"
 DEVICE="${4:-cuda:0}"
 
 echo "=========================================================="
-echo " NeuMark-Native: Watermark Benchmark Evaluation"
-echo " Time:        $(date)"
+echo " NeuMark-Native: Benchmark Robustness & Audio Evaluation"
 echo " Manifest:    ${MANIFEST_PATH}"
 echo " Checkpoint:  ${CKPT_PATH}"
 echo " Output Dir:  ${OUTPUT_DIR}"
@@ -32,6 +31,4 @@ python3 test_valle_native_watermark.py \
     --save-audio-samples 10 \
     --device "${DEVICE}"
 
-echo "=========================================================="
-echo " Evaluation Finished. Results saved to ${OUTPUT_DIR}"
-echo "=========================================================="
+echo " Benchmark evaluation completed! Results in ${OUTPUT_DIR}"
