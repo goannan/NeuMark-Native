@@ -6,7 +6,7 @@ cd "$SCRIPT_DIR"
 
 OUTPUT_DIR="${1:-exp/demo_samples}"
 TEXT="${2:-To be or not to be, that is the question.}"
-PROMPT_AUDIO="${3:-docs/audio/libritts_sample_1/00_prompt.wav}"
+PROMPT_AUDIO="${3:-../../docs/audio/libritts_sample_1/00_prompt.wav}"
 WATERMARK_BITS="${4:-1011001110001101}"
 
 echo "=========================================================="

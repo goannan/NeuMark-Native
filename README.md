@@ -11,7 +11,7 @@
 
 Unlike conventional post-hoc audio watermarking algorithms (e.g., AudioSeal, WavMark) that operate on synthesized waveforms and suffer heavy degradation under neural vocoders and codec compression, **NeuMark-Native embeds covert, multi-bit cryptographic watermark signals directly into the discrete latent acoustic tokens and residual quantization streams during generative synthesis**.
 
-This repository provides the complete, self-contained pipeline from data downloading and base VALL-E model training (Auto-Regressive + Non-Auto-Regressive) to native watermark training, zero-shot inference, and robustness benchmarking.
+This repository preserves the standard **VALL-E / Kaldi recipe architecture** (`valle/` package at root, all experiment recipes, training code, and execution scripts inside `egs/libritts/`) and provides the complete, self-contained pipeline from base VALL-E training (Auto-Regressive + Non-Auto-Regressive) to native watermark training, zero-shot inference, and robustness benchmarking.
 
 ---
 
@@ -30,43 +30,44 @@ NeuMark-Native/
 ├── requirements.txt                   # Complete dependencies
 ├── README.md                          # Full-pipeline tutorial
 ├── .gitignore
-├── shared/                            # CLI option parsing utilities
-│   └── parse_options.sh
 ├── valle/                             # Core VALL-E neural engine
 │   ├── models/                        # AR & NAR Transformers (valle.py, transformer.py)
 │   ├── modules/                       # Custom layer modules & attention
 │   ├── data/                          # Dataset collators, samplers, datamodule
 │   ├── utils/                         # Checkpointing & tensor utilities
 │   └── bin/                           # trainer.py, joint_trainer.py, tokenizer.py, infer.py
-├── bin -> valle/bin                   # Top-level symlink for easy CLI access
-├── models.py                          # Watermark embedder & detector (WMEmbedder, WMDetector)
-├── STmodels/                          # SpeechTokenizer & GAN discriminators
-├── tts_native_train.py                # Standard native watermark training (Accelerate DDP)
-├── tts_native_energy_gated_train.py   # Energy-gated watermark training pipeline
-├── tts_native_loss.py                 # Multi-scale Mel, VAD margin, cosine, adversarial losses
-├── tts_native_dataset.py              # PyTorch Dataset for native watermark training
-├── tts_native_attacks.py              # Differentiable acoustic & distortion attack channels
-├── test_valle_native_watermark.py     # Watermark extraction & robustness benchmark
-├── generate_valle_native_dataset.py   # Tokenized speech pairs generator
-├── generate_demo_audios.py            # Quick audio synthesis
-├── configs/                           # Training & ablation configurations
-│   ├── config_tts_native.json
-│   ├── config_tts_native_energy_gated.json
-│   ├── config_ablation_real_tokens.json
-│   └── config_ablation_valle_neumark_loss.json
-├── scripts/                           # Numbered step-by-step bash scripts
-│   ├── 01_prepare_libritts.sh         # Download & tokenize LibriTTS
-│   ├── 02_train_valle_ar.sh           # Train VALL-E Stage 1 (AR model)
-│   ├── 03_train_valle_nar.sh          # Train VALL-E Stage 2 (NAR model)
-│   ├── 04_train_valle_joint.sh        # Joint VALL-E AR + NAR training
-│   ├── 05_prepare_native_tokens.sh    # Generate paired tokens for watermark training
-│   ├── 06_train_watermark.sh          # Train native watermark model
-│   ├── 07_train_watermark_energy.sh   # Train energy-gated watermark model
-│   ├── 08_infer_zero_shot.sh          # Zero-shot inference with watermarking
-│   └── 09_evaluate_watermark.sh       # Benchmark extraction & audio quality
-└── docs/                              # Academic demo page for GitHub Pages
-    ├── index.html
-    └── audio/
+├── docs/                              # Academic demo page for GitHub Pages
+│   ├── index.html                     # Interactive audio comparison web page
+│   └── audio/                         # Demo audio samples (.wav)
+└── egs/
+    └── libritts/                      # Recipes, training scripts, configs & watermark models
+        ├── bin -> ../../valle/bin     # Symlink to valle/bin
+        ├── shared/                    # parse_options.sh
+        ├── STmodels/                  # SpeechTokenizer & GAN discriminators
+        ├── models.py                  # Watermark embedder & detector (WMEmbedder, WMDetector)
+        ├── configs/                   # Training & ablation configurations
+        │   ├── config_tts_native.json
+        │   ├── config_tts_native_energy_gated.json
+        │   ├── config_ablation_real_tokens.json
+        │   └── config_ablation_valle_neumark_loss.json
+        ├── tts_native_train.py        # Standard native watermark training (Accelerate DDP)
+        ├── tts_native_energy_gated_train.py # Energy-gated watermark training
+        ├── tts_native_loss.py         # Multi-scale Mel, VAD margin, adversarial losses
+        ├── tts_native_dataset.py      # PyTorch Dataset for native watermark training
+        ├── tts_native_attacks.py      # Differentiable distortion attack channels
+        ├── test_valle_native_watermark.py # Extraction & robustness evaluation
+        ├── generate_valle_native_dataset.py # Tokenized speech pairs generator
+        ├── generate_demo_audios.py    # Quick audio synthesis script
+        └── scripts/                   # Step-by-step portable bash scripts
+            ├── 01_prepare_libritts.sh
+            ├── 02_train_valle_ar.sh
+            ├── 03_train_valle_nar.sh
+            ├── 04_train_valle_joint.sh
+            ├── 05_prepare_native_tokens.sh
+            ├── 06_train_watermark.sh
+            ├── 07_train_watermark_energy.sh
+            ├── 08_infer_zero_shot.sh
+            └── 09_evaluate_watermark.sh
 ```
 
 ---
@@ -110,23 +111,28 @@ pip install -e .
 
 ---
 
-## 📦 Step 2: Pretrained Models & Assets
+## 🚀 Step 2: Navigate to Recipe Directory & Download Pretrained Weights
 
+Following standard VALL-E / Kaldi convention, all training, data preparation, and evaluation commands are executed inside `egs/libritts`:
+
+```bash
+cd egs/libritts
+```
+
+### 2.1 Pretrained SpeechTokenizer Model Weights
 NeuMark-Native uses **SpeechTokenizer** for discrete acoustic token representations:
 
 ```bash
 mkdir -p STmodels/pretrained_model
 
 # Download SpeechTokenizer model weights (460MB)
-curl -L -o STmodels/pretrained_model/SpeechTokenizer.pt \
-    https://huggingface.co/fnlp/SpeechTokenizer/resolve/main/speechtokenizer_hubert_avg/SpeechTokenizer.pt
+curl -L -o STmodels/pretrained_model/SpeechTokenizer.pt     https://huggingface.co/fnlp/SpeechTokenizer/resolve/main/speechtokenizer_hubert_avg/SpeechTokenizer.pt
 ```
 
 *(Optional)* Download WavLM for speaker similarity loss calculation:
 ```bash
 mkdir -p models
-curl -L -o models/wavlm_large_finetune.pth \
-    https://github.com/goannan/NeuMark/releases/download/v1.0/wavlm_large_finetune.pth # or official WavLM URL
+curl -L -o models/wavlm_large_finetune.pth     https://github.com/goannan/NeuMark/releases/download/v1.0/wavlm_large_finetune.pth # or official WavLM URL
 ```
 
 ---
@@ -136,18 +142,13 @@ curl -L -o models/wavlm_large_finetune.pth \
 Prepare the LibriTTS dataset (downloads audio, builds Lhotse manifests, extracts SpeechTokenizer acoustic tokens, and phonemizes transcripts):
 
 ```bash
-# Run complete data preparation (Stage 0 to Stage 3)
+# In egs/libritts:
 bash scripts/01_prepare_libritts.sh
 ```
 
 **Custom subsets or directories:**
 ```bash
-bash scripts/01_prepare_libritts.sh \
-    --stage 0 \
-    --stop-stage 3 \
-    --dataset-parts "--dataset-parts all" \
-    --audio-extractor "SpeechTokenizer" \
-    --audio-feats-dir "data/tokenized"
+bash scripts/01_prepare_libritts.sh     --stage 0     --stop-stage 3     --dataset-parts "--dataset-parts all"     --audio-extractor "SpeechTokenizer"     --audio-feats-dir "data/tokenized"
 ```
 This generates:
 - `data/tokenized/cuts_train.jsonl.gz`
@@ -188,10 +189,7 @@ bash scripts/04_train_valle_joint.sh exp/valle_joint data/tokenized
 Generate paired token representations produced by the VALL-E model for training the watermark embedder and detector:
 
 ```bash
-bash scripts/05_prepare_native_tokens.sh \
-    data/tokenized/cuts_train.jsonl.gz \
-    data/tokenized_valle_native \
-    -1
+bash scripts/05_prepare_native_tokens.sh     data/tokenized/cuts_train.jsonl.gz     data/tokenized_valle_native     -1
 ```
 
 ---
@@ -218,11 +216,7 @@ bash scripts/07_train_watermark_energy.sh configs/config_tts_native_energy_gated
 Synthesize zero-shot voice-cloned speech from a target text and 3-second prompt audio with an embedded 16-bit cryptographic watermark:
 
 ```bash
-bash scripts/08_infer_zero_shot.sh \
-    exp/demo_samples \
-    "To be or not to be, that is the question." \
-    docs/audio/libritts_sample_1/00_prompt.wav \
-    "1011001110001101"
+bash scripts/08_infer_zero_shot.sh     exp/demo_samples     "To be or not to be, that is the question."     ../../docs/audio/libritts_sample_1/00_prompt.wav     "1011001110001101"
 ```
 
 ---
@@ -232,11 +226,7 @@ bash scripts/08_infer_zero_shot.sh \
 Evaluate watermark extraction bit accuracy, ROC-AUC, detection latency, and audio quality (PESQ, STOI, SNR, UTMOS) across diverse acoustic distortion attacks:
 
 ```bash
-bash scripts/09_evaluate_watermark.sh \
-    data/tokenized_valle_native/cuts_test_valle_native.jsonl.gz \
-    exp/tts_native_neumark/NeuMark_epoch_010.pt \
-    exp/eval_results \
-    cuda:0
+bash scripts/09_evaluate_watermark.sh     data/tokenized_valle_native/cuts_test_valle_native.jsonl.gz     checkpoints/NeuMark_native_latest.pt     exp/eval_results     cuda:0
 ```
 
 ---
@@ -246,6 +236,10 @@ bash scripts/09_evaluate_watermark.sh \
 Preview the academic demo showcase page locally:
 
 ```bash
+# Return to root directory
+cd ../..
+
+# Start HTTP server for docs/
 cd docs
 python3 -m http.server 8080
 ```

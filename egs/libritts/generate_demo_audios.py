@@ -20,10 +20,19 @@ print('Using device:', device)
 
 st_cfg_path = NEUMARK_ROOT / 'STmodels/pretrained_model/speechtokenizer_hubert_avg_config.json'
 st_ckpt_path = NEUMARK_ROOT / 'STmodels/pretrained_model/SpeechTokenizer.pt'
-neumark_ckpt_path = '/home/wu25/mrnas04home/projects/vall-e/egs/libritts/exp/tts_native_neumark/20260816-192445/NeuMark_epoch_000.pt'
+neumark_ckpt_path = os.environ.get('NEUMARK_CKPT', '')
+if not neumark_ckpt_path or not os.path.exists(neumark_ckpt_path):
+    candidate = SCRIPT_DIR / 'checkpoints/NeuMark_native_latest.pt'
+    if candidate.exists():
+        neumark_ckpt_path = str(candidate)
+    else:
+        fallback = '/home/wu25/mrnas04home/projects/vall-e/egs/libritts/exp/tts_native_neumark/20260816-192445/NeuMark_epoch_000.pt'
+        neumark_ckpt_path = fallback if os.path.exists(fallback) else str(candidate)
 
 # 1. Load SpeechTokenizer
 print('[1/4] Loading SpeechTokenizer...')
+if not st_ckpt_path.exists():
+    raise FileNotFoundError(f'SpeechTokenizer checkpoint not found at {st_ckpt_path}. Please download it following README instructions.')
 with open(st_cfg_path) as f:
     st_cfg = json.load(f)
 st_model = SpeechTokenizer(st_cfg)
@@ -32,10 +41,12 @@ st_model.load_state_dict(st_state)
 st_model.eval().to(device)
 
 # 2. Load NeuMark
-print('[2/4] Loading NeuMark Checkpoint...')
+print(f'[2/4] Loading NeuMark Checkpoint from {neumark_ckpt_path}...')
 msg_processor = WMEmbedder(nbits=16, input_dim=1024, nchunk_size=4).to(device)
 detector = WMDetector(input_channels=1024, nbits=16, nchunk_size=4).to(device)
 
+if not os.path.exists(neumark_ckpt_path):
+    raise FileNotFoundError(f'NeuMark checkpoint not found at {neumark_ckpt_path}. Specify via NEUMARK_CKPT environment variable.')
 ckpt = torch.load(neumark_ckpt_path, map_location='cpu')
 msg_processor.load_state_dict(ckpt['msg_processor'])
 detector.load_state_dict(ckpt['detector'])
