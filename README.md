@@ -47,11 +47,9 @@ NeuMark-Native/
         ├── models.py                  # Watermark embedder & detector (WMEmbedder, WMDetector)
         ├── configs/                   # Training & ablation configurations
         │   ├── config_tts_native.json
-        │   ├── config_tts_native_energy_gated.json
         │   ├── config_ablation_real_tokens.json
         │   └── config_ablation_valle_neumark_loss.json
         ├── tts_native_train.py        # Standard native watermark training (Accelerate DDP)
-        ├── tts_native_energy_gated_train.py # Energy-gated watermark training
         ├── tts_native_loss.py         # Multi-scale Mel, VAD margin, adversarial losses
         ├── tts_native_dataset.py      # PyTorch Dataset for native watermark training
         ├── tts_native_attacks.py      # Differentiable distortion attack channels
@@ -65,9 +63,8 @@ NeuMark-Native/
             ├── 04_train_valle_joint.sh
             ├── 05_prepare_native_tokens.sh
             ├── 06_train_watermark.sh
-            ├── 07_train_watermark_energy.sh
-            ├── 08_infer_zero_shot.sh
-            └── 09_evaluate_watermark.sh
+            ├── 07_infer_zero_shot.sh
+            └── 08_evaluate_watermark.sh
 ```
 
 ---
@@ -196,17 +193,10 @@ bash scripts/05_prepare_native_tokens.sh     data/tokenized/cuts_train.jsonl.gz 
 
 ## 🔐 Step 6: Native Watermark Model Training
 
-Train the **WMEmbedder** and **WMDetector** models to embed multi-bit watermark payloads into the discrete acoustic representations.
+Train the **WMEmbedder** and **WMDetector** models to embed multi-bit watermark payloads into the discrete acoustic representations:
 
-### Option A: Standard Native Watermark Training
 ```bash
 bash scripts/06_train_watermark.sh configs/config_tts_native.json
-```
-
-### Option B: Energy-Gated Native Watermark Training
-Dynamically adjusts watermark injection strength based on speech energy, avoiding audible distortion during silence/unvoiced segments:
-```bash
-bash scripts/07_train_watermark_energy.sh configs/config_tts_native_energy_gated.json
 ```
 
 ---
@@ -216,7 +206,7 @@ bash scripts/07_train_watermark_energy.sh configs/config_tts_native_energy_gated
 Synthesize zero-shot voice-cloned speech from a target text and 3-second prompt audio with an embedded 16-bit cryptographic watermark:
 
 ```bash
-bash scripts/08_infer_zero_shot.sh     exp/demo_samples     "To be or not to be, that is the question."     ../../docs/audio/libritts_sample_1/00_prompt.wav     "1011001110001101"
+bash scripts/07_infer_zero_shot.sh     exp/demo_samples     "To be or not to be, that is the question."     ../../docs/audio/libritts_sample_1/00_prompt.wav     "1011001110001101"
 ```
 
 ---
@@ -226,7 +216,7 @@ bash scripts/08_infer_zero_shot.sh     exp/demo_samples     "To be or not to be,
 Evaluate watermark extraction bit accuracy, ROC-AUC, detection latency, and audio quality (PESQ, STOI, SNR, UTMOS) across diverse acoustic distortion attacks:
 
 ```bash
-bash scripts/09_evaluate_watermark.sh     data/tokenized_valle_native/cuts_test_valle_native.jsonl.gz     checkpoints/NeuMark_native_latest.pt     exp/eval_results     cuda:0
+bash scripts/08_evaluate_watermark.sh     data/tokenized_valle_native/cuts_test_valle_native.jsonl.gz     checkpoints/NeuMark_native_latest.pt     exp/eval_results     cuda:0
 ```
 
 ---
