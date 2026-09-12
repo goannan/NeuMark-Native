@@ -20,9 +20,13 @@ ENV/
 *.pth
 *.ckpt
 *.bin
-checkpoints/
 models/*.pth
 STmodels/pretrained_model/*.pt
+checkpoints/*
+egs/libritts/checkpoints/*
+!checkpoints/NeuMark-Native.pt
+!egs/libritts/checkpoints/NeuMark-Native.pt
+!**/NeuMark-Native.pt
 
 # Training outputs & logs
 exp/

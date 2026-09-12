@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
 MANIFEST_PATH="${1:-data/tokenized_valle_native/cuts_test_valle_native.jsonl.gz}"
-CKPT_PATH="${2:-checkpoints/NeuMark_native_latest.pt}"
+CKPT_PATH="${2:-checkpoints/NeuMark-Native.pt}"
 OUTPUT_DIR="${3:-exp/eval_results}"
 DEVICE="${4:-cuda:0}"
 

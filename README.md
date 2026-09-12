@@ -30,6 +30,7 @@ NeuMark-Native/
 ├── requirements.txt                   # Complete dependencies
 ├── README.md                          # Full-pipeline tutorial
 ├── .gitignore
+├── checkpoints -> egs/libritts/checkpoints # Symlink to model checkpoints
 ├── valle/                             # Core VALL-E neural engine
 │   ├── models/                        # AR & NAR Transformers (valle.py, transformer.py)
 │   ├── modules/                       # Custom layer modules & attention
@@ -42,6 +43,8 @@ NeuMark-Native/
 └── egs/
     └── libritts/                      # Recipes, training scripts, configs & watermark models
         ├── bin -> ../../valle/bin     # Symlink to valle/bin
+        ├── checkpoints/               # Pretrained & trained model checkpoints
+        │   └── NeuMark-Native.pt      # Official pretrained watermark embedder & detector
         ├── shared/                    # parse_options.sh
         ├── STmodels/                  # SpeechTokenizer & GAN discriminators
         ├── models.py                  # Watermark embedder & detector (WMEmbedder, WMDetector)
@@ -108,7 +111,7 @@ pip install -e .
 
 ---
 
-## 🚀 Step 2: Navigate to Recipe Directory & Download Pretrained Weights
+## 🚀 Step 2: Navigate to Recipe Directory & Pretrained Weights
 
 Following standard VALL-E / Kaldi convention, all training, data preparation, and evaluation commands are executed inside `egs/libritts`:
 
@@ -116,7 +119,13 @@ Following standard VALL-E / Kaldi convention, all training, data preparation, an
 cd egs/libritts
 ```
 
-### 2.1 Pretrained SpeechTokenizer Model Weights
+### 2.1 Official Pretrained NeuMark-Native Model Checkpoint
+The official trained checkpoint is included directly in this repository:
+- **Location**: `egs/libritts/checkpoints/NeuMark-Native.pt` (or `checkpoints/NeuMark-Native.pt`)
+- **Contents**: Trained `WMEmbedder` (`msg_processor`) and `WMDetector` (`detector`) trained on LibriTTS for 130,950 steps (10 epochs).
+- **Usage**: You can **directly skip training** and verify watermark embedding and extraction using this checkpoint!
+
+### 2.2 Pretrained SpeechTokenizer Model Weights
 NeuMark-Native uses **SpeechTokenizer** for discrete acoustic token representations:
 
 ```bash
@@ -134,7 +143,27 @@ curl -L -o models/wavlm_large_finetune.pth     https://github.com/goannan/NeuMar
 
 ---
 
-## 📊 Step 3: LibriTTS Data Preparation
+## ⚡ Direct Verification with Pretrained Checkpoint
+
+If you want to immediately test and verify the watermark embedder and detector without retraining from scratch, run either of the following commands:
+
+### Option A: Zero-Shot Speech Synthesis with Watermark Embedding
+Synthesize voice-cloned speech with a 16-bit watermark payload and immediately extract the watermark to verify bit accuracy:
+```bash
+# In egs/libritts:
+bash scripts/07_infer_zero_shot.sh     exp/demo_samples     "To be or not to be, that is the question."     ../../docs/audio/libritts_sample_1/00_prompt.wav     "1011001110001101"
+```
+
+### Option B: Benchmark Robustness & Audio Quality Evaluation
+Evaluate watermark extraction accuracy, ROC-AUC, SNR, UTMOS, and PESQ across multiple acoustic distortion channels:
+```bash
+# In egs/libritts:
+bash scripts/08_evaluate_watermark.sh     data/tokenized_valle_native/cuts_test_valle_native.jsonl.gz     checkpoints/NeuMark-Native.pt     exp/eval_results     cuda:0
+```
+
+---
+
+## 📊 Step 3: LibriTTS Data Preparation (For Training from Scratch)
 
 Prepare the LibriTTS dataset (downloads audio, builds Lhotse manifests, extracts SpeechTokenizer acoustic tokens, and phonemizes transcripts):
 
@@ -216,7 +245,7 @@ bash scripts/07_infer_zero_shot.sh     exp/demo_samples     "To be or not to be,
 Evaluate watermark extraction bit accuracy, ROC-AUC, detection latency, and audio quality (PESQ, STOI, SNR, UTMOS) across diverse acoustic distortion attacks:
 
 ```bash
-bash scripts/08_evaluate_watermark.sh     data/tokenized_valle_native/cuts_test_valle_native.jsonl.gz     checkpoints/NeuMark_native_latest.pt     exp/eval_results     cuda:0
+bash scripts/08_evaluate_watermark.sh     data/tokenized_valle_native/cuts_test_valle_native.jsonl.gz     checkpoints/NeuMark-Native.pt     exp/eval_results     cuda:0
 ```
 
 ---

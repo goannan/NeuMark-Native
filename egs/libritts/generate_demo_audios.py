@@ -22,7 +22,9 @@ st_cfg_path = NEUMARK_ROOT / 'STmodels/pretrained_model/speechtokenizer_hubert_a
 st_ckpt_path = NEUMARK_ROOT / 'STmodels/pretrained_model/SpeechTokenizer.pt'
 neumark_ckpt_path = os.environ.get('NEUMARK_CKPT', '')
 if not neumark_ckpt_path or not os.path.exists(neumark_ckpt_path):
-    candidate = SCRIPT_DIR / 'checkpoints/NeuMark_native_latest.pt'
+    candidate = SCRIPT_DIR / 'checkpoints/NeuMark-Native.pt'
+    if not candidate.exists():
+        candidate = SCRIPT_DIR / 'checkpoints/NeuMark_native_latest.pt'
     if candidate.exists():
         neumark_ckpt_path = str(candidate)
     else:
