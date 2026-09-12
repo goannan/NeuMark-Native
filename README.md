@@ -12,7 +12,7 @@
 Unlike conventional post-hoc audio watermarking that operates on synthesized waveforms, NeuMark-Native embeds covert cryptographic watermark signals directly into discrete latent acoustic tokens during generative synthesis.
 
 - **Interactive Audio Demos**: [https://goannan.github.io/NeuMark-Native/](https://goannan.github.io/NeuMark-Native/)
-- **Pretrained Weights**: Pretrained `checkpoints/NeuMark-Native.pt` is included directly in this repository for instant verification.
+- **Pretrained Checkpoint**: `checkpoints/NeuMark-Native.pt` is included directly in this repository for instant verification.
 
 ---
 
@@ -68,42 +68,31 @@ NeuMark-Native/
 
 ## Installation & Environment Setup
 
-### 1. System Packages & Python Environment
 ```bash
+# 1. System packages & Python environment
 sudo apt-get update && sudo apt-get install -y espeak-ng sox libsox-fmt-all git-lfs
-
 conda create -n neumark-native python=3.10 -y
 conda activate neumark-native
-```
 
-### 2. Install Dependencies & NeuMark-Native
-```bash
+# 2. Clone repo & install base dependencies
 git clone https://github.com/goannan/NeuMark-Native.git
 cd NeuMark-Native
-
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# Install k2 & icefall
+# 3. Install k2, icefall & NeuMark-Native (valle)
 pip install k2 -f https://k2-fsa.github.io/k2/cuda.html || true
 git clone https://github.com/k2-fsa/icefall.git ../icefall
 export PYTHONPATH=$PWD/../icefall:$PYTHONPATH
-
-# Install valle package in editable mode
 pip install -e .
-```
 
-### 3. Pretrained SpeechTokenizer Weights
-```bash
+# 4. Download pretrained SpeechTokenizer weights
 cd egs/libritts
 mkdir -p STmodels/pretrained_model
-
 curl -L -o STmodels/pretrained_model/SpeechTokenizer.pt \
     https://huggingface.co/fnlp/SpeechTokenizer/resolve/main/speechtokenizer_hubert_avg/SpeechTokenizer.pt
-```
 
-*(Optional) Download WavLM for speaker similarity evaluation:*
-```bash
+# (Optional) Download WavLM for speaker similarity evaluation
 mkdir -p models
 curl -L -o models/wavlm_large_finetune.pth \
     https://github.com/goannan/NeuMark/releases/download/v1.0/wavlm_large_finetune.pth
@@ -113,25 +102,19 @@ curl -L -o models/wavlm_large_finetune.pth \
 
 ## Quick Start: Verification with Pretrained Checkpoint
 
-The official checkpoint **`checkpoints/NeuMark-Native.pt`** (130k steps / 10 epochs on LibriTTS) is included directly in the repo. You can skip training and immediately verify watermark embedding and extraction:
+The official model **`checkpoints/NeuMark-Native.pt`** (trained for 130k steps on LibriTTS) is included directly in the repo. You can skip training and immediately verify watermark embedding and extraction:
 
 ```bash
 cd egs/libritts
-```
 
-### 1. Zero-Shot Speech Synthesis with Watermarking
-Synthesize speech with a 16-bit watermark payload and verify extraction accuracy:
-```bash
+# 1. Zero-shot speech synthesis with 16-bit watermark embedding & extraction
 bash scripts/07_infer_zero_shot.sh \
     exp/demo_samples \
     "To be or not to be, that is the question." \
     ../../docs/audio/libritts_sample_1/00_prompt.wav \
     "1011001110001101"
-```
 
-### 2. Benchmark Robustness Evaluation
-Evaluate watermark extraction accuracy, ROC-AUC, SNR, UTMOS, and PESQ across distortion channels:
-```bash
+# 2. Benchmark robustness evaluation across multiple distortion channels
 bash scripts/08_evaluate_watermark.sh \
     data/tokenized_valle_native/cuts_test_valle_native.jsonl.gz \
     checkpoints/NeuMark-Native.pt \
@@ -147,51 +130,27 @@ All training steps are executed inside `egs/libritts`:
 
 ```bash
 cd egs/libritts
-```
 
-### 1. LibriTTS Data Preparation
-Download audio, build Lhotse manifests, extract SpeechTokenizer acoustic tokens, and phonemize text:
-```bash
+# Stage 1: LibriTTS data download, Lhotse manifests, and SpeechTokenizer tokenization
 bash scripts/01_prepare_libritts.sh \
     --stage 0 \
     --stop-stage 3 \
     --dataset-parts "--dataset-parts all" \
     --audio-extractor "SpeechTokenizer" \
     --audio-feats-dir "data/tokenized"
-```
 
-### 2. Base VALL-E Model Training
-Train Auto-Regressive (Stage 1) and Non-Auto-Regressive (Stage 2) models:
-```bash
-# Stage 1: AR Model Training
-bash scripts/02_train_valle_ar.sh \
-    exp/valle_ar \
-    data/tokenized \
-    16000
+# Stage 2: Train base VALL-E models (Stage 1 AR & Stage 2 NAR)
+bash scripts/02_train_valle_ar.sh exp/valle_ar data/tokenized 16000
+bash scripts/03_train_valle_nar.sh exp/valle_nar exp/valle_ar/best-valid-loss.pt data/tokenized 16000
+# (Alternative joint training: bash scripts/04_train_valle_joint.sh exp/valle_joint data/tokenized)
 
-# Stage 2: NAR Model Training
-bash scripts/03_train_valle_nar.sh \
-    exp/valle_nar \
-    exp/valle_ar/best-valid-loss.pt \
-    data/tokenized \
-    16000
-
-# (Alternative) Joint AR + NAR Training:
-# bash scripts/04_train_valle_joint.sh exp/valle_joint data/tokenized
-```
-
-### 3. Native Token Pair Extraction
-Generate paired token representations from the trained VALL-E model for watermark training:
-```bash
+# Stage 3: Extract paired native token representations from trained VALL-E
 bash scripts/05_prepare_native_tokens.sh \
     data/tokenized/cuts_train.jsonl.gz \
     data/tokenized_valle_native \
     -1
-```
 
-### 4. Native Watermark Model Training
-Train `WMEmbedder` and `WMDetector` on discrete acoustic representations:
-```bash
+# Stage 4: Train native watermark embedder & detector (Accelerate DDP)
 bash scripts/06_train_watermark.sh configs/config_tts_native.json
 ```
 
