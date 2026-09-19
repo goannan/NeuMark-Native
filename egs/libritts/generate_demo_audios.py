@@ -141,10 +141,10 @@ def main():
         if f.exists():
             audio_files = [f]
     else:
-        # Default priority: samples/ in egs/libritts
+        # Default priority: samples/ in egs/libritts (all 10 clean TTS samples)
         sample_dir = SCRIPT_DIR / "samples"
         if sample_dir.exists() and len(list(sample_dir.glob("*.wav"))) > 0:
-            audio_files = [sample_dir / "clean_tts_01.wav"]
+            audio_files = sorted(sample_dir.glob("*.wav"))
         else:
             candidates = [
                 PROJECT_DIR / "docs/audio/clean_samples/clean_tts_01.wav",

@@ -119,14 +119,11 @@ To immediately verify NeuMark-Native's core capability without any prior trainin
 ```bash
 cd egs/libritts
 
-# 1. Verify discrete acoustic token watermark embedding on a clean TTS audio sample:
+# Verify discrete acoustic token watermark embedding & benchmark robustness across the 10 clean TTS samples:
 python3 generate_demo_audios.py \
-    --audio-path samples/clean_tts_01.wav \
+    --audio-dir samples \
     --message 1011001110001101 \
     --output-dir exp/demo_samples
-
-# 2. (Optional) Run comprehensive benchmark evaluation across all 10 clean sample audios:
-python3 generate_demo_audios.py --audio-dir samples
 
 # Or run the zero-shot wrapper script directly
 bash scripts/07_infer_zero_shot.sh
