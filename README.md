@@ -124,22 +124,6 @@ python3 generate_demo_audios.py \
 bash scripts/07_infer_zero_shot.sh
 ```
 
-**Expected verification output:**
-```text
-======================================================================
- VERIFICATION RESULTS:
-   Embedded Watermark: 1011001110001101
-   Extracted Bits:     1011001110001101
-   Bit Accuracy:       100.00% (16/16 bits match)
-   Detection Score:    0.999991
-----------------------------------------------------------------------
- Saved Audio Files:
-   1. Clean Reconstruction: exp/demo_samples/clean_reconstructed.wav
-   2. Watermarked Audio:    exp/demo_samples/watermarked_native.wav
-   3. Residual (Diff x 10): exp/demo_samples/watermark_diff_x10.wav
-======================================================================
-```
-
 ---
 
 ## Full Pipeline: Train VALL-E Base Model & End-to-End Inference
