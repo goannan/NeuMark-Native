@@ -17,6 +17,13 @@ echo " Output Dir:  ${OUTPUT_DIR}"
 echo " Device:      ${DEVICE}"
 echo "=========================================================="
 
+if [ ! -e "${MANIFEST_PATH}" ]; then
+    echo " [Error] Test manifest not found at: ${MANIFEST_PATH}"
+    echo " Token manifests are generated after VALL-E training."
+    echo " Please complete Stages 1-3 in README.md (run scripts/05_prepare_native_tokens.sh)."
+    exit 1
+fi
+
 mkdir -p "${OUTPUT_DIR}"
 
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
