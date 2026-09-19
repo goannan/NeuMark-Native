@@ -39,11 +39,16 @@ NeuMark-Native/
 ├── docs/                              # Demo showcase page (GitHub Pages)
 │   ├── index.html
 │   └── audio/                         # Demo audio samples (.wav)
+│       └── clean_samples/             # 10 clean synthesized TTS reference audio samples
 └── egs/
     └── libritts/                      # Recipes, training scripts, configs & watermark models
         ├── bin -> ../../valle/bin     # Symlink to valle/bin
         ├── checkpoints/               # Checkpoint directory
         │   └── NeuMark-Native.pt      # Pretrained watermark embedder & detector (80.5 MB)
+        ├── samples/                   # 10 clean synthesized TTS test audio samples (.wav)
+        │   ├── clean_tts_01.wav
+        │   ├── ...
+        │   └── clean_tts_10.wav
         ├── shared/                    # parse_options.sh
         ├── STmodels/                  # SpeechTokenizer architecture & discriminators
         ├── models.py                  # Watermark embedder & detector (WMEmbedder, WMDetector)
@@ -109,16 +114,19 @@ curl -L -o models/wavlm_large_finetune.pth \
 
 Full zero-shot speech synthesis from text requires training the VALL-E base model (~1.4 GB, described in the Full Pipeline below). 
 
-To immediately verify NeuMark-Native's core capability without any prior training, the official watermark checkpoint **`checkpoints/NeuMark-Native.pt`** (80.5 MB) is provided directly in the repository. You can verify discrete token watermark embedding, audio synthesis, and bit extraction on a sample audio (or any custom `.wav`) in seconds:
+To immediately verify NeuMark-Native's core capability without any prior training, the official watermark checkpoint **`checkpoints/NeuMark-Native.pt`** (80.5 MB) and **10 clean synthesized TTS audio samples** (`samples/clean_tts_01.wav` ~ `clean_tts_10.wav`) are included directly in the repository. You can verify discrete token watermark embedding, audio synthesis, and the complete robustness attack benchmark in seconds:
 
 ```bash
 cd egs/libritts
 
-# Verify discrete acoustic token watermark embedding & bit extraction
+# 1. Verify discrete acoustic token watermark embedding on a clean TTS audio sample:
 python3 generate_demo_audios.py \
-    --audio-path ../../docs/audio/libritts_sample_1/01_clean_tts.wav \
+    --audio-path samples/clean_tts_01.wav \
     --message 1011001110001101 \
     --output-dir exp/demo_samples
+
+# 2. (Optional) Run comprehensive benchmark evaluation across all 10 clean sample audios:
+python3 generate_demo_audios.py --audio-dir samples
 
 # Or run the zero-shot wrapper script directly
 bash scripts/07_infer_zero_shot.sh

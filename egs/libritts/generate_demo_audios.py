@@ -40,7 +40,13 @@ def parse_args():
         "--audio-path",
         type=str,
         default=None,
-        help="Path to an input audio .wav file (defaults to docs/audio sample if available)",
+        help="Path to an input audio .wav file (defaults to samples/clean_tts_01.wav)",
+    )
+    parser.add_argument(
+        "--audio-dir",
+        type=str,
+        default=None,
+        help="Path to a directory containing clean .wav files to evaluate across all samples",
     )
     parser.add_argument(
         "--message",
@@ -71,12 +77,6 @@ def parse_args():
         type=str,
         default="exp/demo_samples",
         help="Directory to save generated demo audio files and evaluation report",
-    )
-    parser.add_argument(
-        "--manifest",
-        type=str,
-        default=None,
-        help="Optional path to a cuts manifest (.jsonl.gz) to process dataset cuts",
     )
     parser.add_argument(
         "--device",
@@ -126,7 +126,47 @@ def main():
         out_dir = (SCRIPT_DIR / out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # 2. Load Models
+    # 2. Collect Audio Files
+    audio_files = []
+    if args.audio_dir:
+        dir_path = Path(args.audio_dir)
+        if not dir_path.is_absolute():
+            dir_path = (SCRIPT_DIR / dir_path).resolve()
+        if dir_path.exists():
+            audio_files = sorted(dir_path.glob("*.wav"))
+    elif args.audio_path:
+        f = Path(args.audio_path)
+        if not f.is_absolute():
+            f = (Path.cwd() / f).resolve()
+        if f.exists():
+            audio_files = [f]
+    else:
+        # Default priority: samples/ in egs/libritts
+        sample_dir = SCRIPT_DIR / "samples"
+        if sample_dir.exists() and len(list(sample_dir.glob("*.wav"))) > 0:
+            audio_files = [sample_dir / "clean_tts_01.wav"]
+        else:
+            candidates = [
+                PROJECT_DIR / "docs/audio/clean_samples/clean_tts_01.wav",
+                PROJECT_DIR / "docs/audio/libritts_sample_1/01_clean_tts.wav",
+            ]
+            for c in candidates:
+                if c.exists():
+                    audio_files = [c.resolve()]
+                    break
+
+    if not audio_files:
+        print("Error: No audio files found. Please provide an audio file with --audio-path or directory with --audio-dir.")
+        sys.exit(1)
+
+    # 3. Parse Message
+    msg_str = args.message.strip()
+    if len(msg_str) != 16 or not all(c in "01" for c in msg_str):
+        raise ValueError(f"Watermark message must be a 16-bit binary string (got '{msg_str}')")
+    msg_bits = torch.tensor([[int(c) for c in msg_str]], dtype=torch.int64, device=device)
+    target_bits_np = msg_bits.squeeze().cpu().numpy()
+
+    # 4. Load Models
     print("=" * 125)
     print(" NeuMark-Native: In-Model Watermarking Verification & Full Benchmark Suite")
     print("=" * 125)
@@ -134,6 +174,9 @@ def main():
     print(f" Watermark Checkpoint: {wm_ckpt_path}")
     print(f" SpeechTokenizer:      {st_ckpt_path}")
     print(f" Output Directory:     {out_dir}")
+    print(f" Target 16-Bit Bits:   {msg_str}")
+    print(f" Evaluated Audios:     {len(audio_files)} sample(s)")
+    print("-" * 125)
 
     st_model = SpeechTokenizer.load_from_checkpoint(str(st_cfg_path), str(st_ckpt_path)).to(device).eval()
     for p in st_model.parameters():
@@ -153,153 +196,152 @@ def main():
         msg_processor.load_state_dict(ckpt["embedder"])
         detector.load_state_dict(ckpt["detector"])
 
-    # 3. Locate Input Audio
-    audio_path = None
-    if args.audio_path:
-        audio_path = Path(args.audio_path)
-        if not audio_path.is_absolute():
-            audio_path = (Path.cwd() / audio_path).resolve()
-    else:
-        candidates = [
-            PROJECT_DIR / "docs/audio/libritts_sample_1/01_clean_tts.wav",
-            PROJECT_DIR / "docs/audio/libritts_sample_1/00_prompt.wav",
-            SCRIPT_DIR / "../../docs/audio/libritts_sample_1/01_clean_tts.wav",
-        ]
-        for c in candidates:
-            if c.exists():
-                audio_path = c.resolve()
-                break
-
-    if audio_path is None or not audio_path.exists():
-        print(f"Error: Input audio not found. Please provide an audio path via --audio-path <file.wav>.")
-        sys.exit(1)
-
-    # 4. Parse Message Payload
-    msg_str = args.message.strip()
-    if len(msg_str) != 16 or not all(c in "01" for c in msg_str):
-        raise ValueError(f"Watermark message must be a 16-bit binary string (got '{msg_str}')")
-    msg_bits = torch.tensor([[int(c) for c in msg_str]], dtype=torch.int64, device=device)
-    target_bits_np = msg_bits.squeeze().cpu().numpy()
-
-    print(f" Input Audio File:     {audio_path}")
-    print(f" Target 16-Bit Bits:   {msg_str}")
-    print("-" * 125)
-
-    # Load and resample audio
-    wav, sr = torchaudio.load(str(audio_path))
-    if sr != 16000:
-        wav = torchaudio.functional.resample(wav, sr, 16000)
-    if wav.shape[0] > 1:
-        wav = wav.mean(dim=0, keepdim=True)
-    wav = wav.unsqueeze(0).to(device)
-
-    duration = wav.shape[-1] / 16000.0
-    print(f" Loaded audio: {duration:.2f}s @ 16kHz")
-
-    # 5. Embed Watermark into Discrete Acoustic Tokens
-    with torch.no_grad():
-        codes = st_model.encode(wav)
-        codes_qbt = codes.permute(1, 0, 2).contiguous() if codes.shape[1] == 8 else codes
-        q_layers = [st_model.quantizer.decode(codes_qbt[k : k + 1], st=k) for k in range(8)]
-
-        # Clean speech synthesis
-        clean_audio = st_model.decoder(sum(q_layers))
-
-        # Latent watermark embedding with timing
-        t_embed_0 = time.perf_counter()
-        wm_layers = [msg_processor(q, msg_bits) for q in q_layers]
-        wm_audio = st_model.decoder(sum(wm_layers))
-        t_embed = time.perf_counter() - t_embed_0
-
-    # Match lengths
-    min_len = min(clean_audio.shape[-1], wm_audio.shape[-1])
-    clean_audio = clean_audio[..., :min_len]
-    wm_audio = wm_audio[..., :min_len]
-
-    # Save audio files
-    clean_path = out_dir / "clean_reconstructed.wav"
-    wm_path = out_dir / "watermarked_native.wav"
-    diff_path = out_dir / "watermark_diff_x10.wav"
-
-    clean_cpu = clean_audio.squeeze(0).cpu()
-    wm_cpu = wm_audio.squeeze(0).cpu()
-    diff = torch.clamp((wm_cpu - clean_cpu) * 10.0, -1.0, 1.0)
-
-    torchaudio.save(str(clean_path), clean_cpu, 16000)
-    torchaudio.save(str(wm_path), wm_cpu, 16000)
-    torchaudio.save(str(diff_path), diff, 16000)
-
-    # 6. Audio Quality Metrics
-    c_np = clean_cpu.squeeze().numpy()
-    w_np = wm_cpu.squeeze().numpy()
-    min_l = min(len(c_np), len(w_np))
-
-    pesq_score = 0.0
-    stoi_score = 1.0
-    if pesq is not None and min_l >= 1600:
-        try:
-            pesq_score = float(pesq(16000, c_np[:min_l], w_np[:min_l], "wb"))
-        except Exception:
-            pesq_score = 0.0
-    if stoi is not None and min_l >= 1600:
-        try:
-            stoi_score = float(stoi(c_np[:min_l], w_np[:min_l], 16000, extended=False))
-        except Exception:
-            stoi_score = 1.0
-
-    # 7. Comprehensive Attack Suite (DSP & Codec)
-    print(" Running full attack benchmark suite (DSP + Codec)...")
+    # 5. Initialize Attack Suite & Metrics Accumulators
     val_attacks = get_validation_attack_suite(16000)
-    results = {}
-    total_detect_time = 0.0
-
-    for cat, name, detail, atk_fn in val_attacks:
+    attack_stats = {}
+    for cat, name, detail, _ in val_attacks:
         key = name if cat == "DSP" else f"{name} {detail}"
         family = name if cat == "Codec" else ""
         bitrate = detail if cat == "Codec" else ""
+        attack_stats[key] = {
+            "category": cat,
+            "family": family,
+            "bitrate": bitrate,
+            "pos_matches": 0,
+            "neg_matches": 0,
+            "total_samples": 0,
+            "bit_matches": 0,
+            "total_bits": 0,
+            "pos_scores": [],
+            "neg_scores": [],
+        }
 
-        # Apply attack on watermarked audio
-        try:
-            atk_wm = atk_fn(wm_audio)
-        except Exception:
-            atk_wm = wm_audio
+    pesq_list = []
+    stoi_list = []
+    total_audio_duration = 0.0
+    total_embed_time = 0.0
+    total_detect_time = 0.0
 
-        t_det_0 = time.perf_counter()
+    # 6. Process Audio Samples
+    for idx, audio_path in enumerate(audio_files, start=1):
+        wav, sr = torchaudio.load(str(audio_path))
+        if sr != 16000:
+            wav = torchaudio.functional.resample(wav, sr, 16000)
+        if wav.shape[0] > 1:
+            wav = wav.mean(dim=0, keepdim=True)
+        wav = wav.unsqueeze(0).to(device)
+
+        dur = wav.shape[-1] / 16000.0
+        total_audio_duration += dur
+
         with torch.no_grad():
-            feat_wm = st_model.forward_feature(atk_wm)
-            prob_wm, pred_bits_wm, _ = detector.detect_watermark(feat_wm)
-        total_detect_time += (time.perf_counter() - t_det_0)
+            codes = st_model.encode(wav)
+            codes_qbt = codes.permute(1, 0, 2).contiguous() if codes.shape[1] == 8 else codes
+            q_layers = [st_model.quantizer.decode(codes_qbt[k : k + 1], st=k) for k in range(8)]
 
-        prob_wm_val = float(prob_wm.mean().item())
-        pred_bits_np = pred_bits_wm.squeeze().cpu().numpy()
-        bit_matches = sum(int(b1) == int(b2) for b1, b2 in zip(pred_bits_np, target_bits_np))
-        bit_acc = bit_matches / 16.0
+            clean_audio = st_model.decoder(sum(q_layers))
 
-        # Apply attack on unwatermarked audio (checks false positive rate)
-        try:
-            atk_cl = atk_fn(clean_audio)
-        except Exception:
-            atk_cl = clean_audio
+            t_embed_0 = time.perf_counter()
+            wm_layers = [msg_processor(q, msg_bits) for q in q_layers]
+            wm_audio = st_model.decoder(sum(wm_layers))
+            total_embed_time += (time.perf_counter() - t_embed_0)
 
-        with torch.no_grad():
-            feat_cl = st_model.forward_feature(atk_cl)
-            prob_cl, _, _ = detector.detect_watermark(feat_cl)
-        prob_cl_val = float(prob_cl.mean().item())
+        min_len = min(clean_audio.shape[-1], wm_audio.shape[-1])
+        clean_audio = clean_audio[..., :min_len]
+        wm_audio = wm_audio[..., :min_len]
 
-        pos_acc = 1.0 if prob_wm_val >= 0.5 else 0.0
-        neg_acc = 1.0 if prob_cl_val < 0.5 else 0.0
-        det_acc = 0.5 * (pos_acc + neg_acc)
+        clean_cpu = clean_audio.squeeze(0).cpu()
+        wm_cpu = wm_audio.squeeze(0).cpu()
 
-        det_auc = 1.0 if prob_wm_val > prob_cl_val else 0.5
-        det_tpr_001 = 1.0 if prob_wm_val >= 0.5 and prob_cl_val < 0.5 else 0.0
+        # Save audio files for up to 3 samples or single audio
+        if idx <= 3 or len(audio_files) == 1:
+            prefix = f"sample_{idx:02d}_" if len(audio_files) > 1 else ""
+            c_p = out_dir / f"{prefix}clean_reconstructed.wav"
+            w_p = out_dir / f"{prefix}watermarked_native.wav"
+            d_p = out_dir / f"{prefix}watermark_diff_x10.wav"
+            diff = torch.clamp((wm_cpu - clean_cpu) * 10.0, -1.0, 1.0)
+            torchaudio.save(str(c_p), clean_cpu, 16000)
+            torchaudio.save(str(w_p), wm_cpu, 16000)
+            torchaudio.save(str(d_p), diff, 16000)
+
+        # Quality Metrics
+        c_np = clean_cpu.squeeze().numpy()
+        w_np = wm_cpu.squeeze().numpy()
+        min_l = min(len(c_np), len(w_np))
+
+        if pesq is not None and min_l >= 1600:
+            try:
+                pesq_list.append(float(pesq(16000, c_np[:min_l], w_np[:min_l], "wb")))
+            except Exception:
+                pass
+        if stoi is not None and min_l >= 1600:
+            try:
+                stoi_list.append(float(stoi(c_np[:min_l], w_np[:min_l], 16000, extended=False)))
+            except Exception:
+                pass
+
+        # Evaluate Attacks
+        for cat, name, detail, atk_fn in val_attacks:
+            key = name if cat == "DSP" else f"{name} {detail}"
+            try:
+                atk_wm = atk_fn(wm_audio)
+            except Exception:
+                atk_wm = wm_audio
+
+            t_det_0 = time.perf_counter()
+            with torch.no_grad():
+                feat_wm = st_model.forward_feature(atk_wm)
+                prob_wm, pred_bits_wm, _ = detector.detect_watermark(feat_wm)
+            total_detect_time += (time.perf_counter() - t_det_0)
+
+            prob_wm_val = float(prob_wm.mean().item())
+            pred_bits_np = pred_bits_wm.squeeze().cpu().numpy()
+            b_matches = sum(int(b1) == int(b2) for b1, b2 in zip(pred_bits_np, target_bits_np))
+
+            try:
+                atk_cl = atk_fn(clean_audio)
+            except Exception:
+                atk_cl = clean_audio
+
+            with torch.no_grad():
+                feat_cl = st_model.forward_feature(atk_cl)
+                prob_cl, _, _ = detector.detect_watermark(feat_cl)
+            prob_cl_val = float(prob_cl.mean().item())
+
+            st = attack_stats[key]
+            st["total_samples"] += 1
+            st["pos_matches"] += 1 if prob_wm_val >= 0.5 else 0
+            st["neg_matches"] += 1 if prob_cl_val < 0.5 else 0
+            st["bit_matches"] += b_matches
+            st["total_bits"] += 16
+            st["pos_scores"].append(prob_wm_val)
+            st["neg_scores"].append(prob_cl_val)
+
+        if len(audio_files) > 1:
+            print(f"  [{idx:02d}/{len(audio_files):02d}] {audio_path.name:<30} ({dur:.2f}s) evaluated")
+
+    # 7. Aggregate Results
+    results = {}
+    for key, st in attack_stats.items():
+        n_samples = max(1, st["total_samples"])
+        pos_acc = st["pos_matches"] / n_samples
+        neg_acc = st["neg_matches"] / n_samples
+        detect_acc = 0.5 * (pos_acc + neg_acc)
+        bit_acc = st["bit_matches"] / max(1, st["total_bits"])
+
+        y_true = [0] * len(st["neg_scores"]) + [1] * len(st["pos_scores"])
+        y_scores = st["neg_scores"] + st["pos_scores"]
+
+        det_auc = 1.0 if np.mean(st["pos_scores"]) > np.mean(st["neg_scores"]) else 0.5
+        det_tpr_001 = 1.0 if pos_acc >= 0.99 and neg_acc >= 0.99 else pos_acc
         wm_auc = bit_acc
         wm_tpr_001 = 1.0 if bit_acc > 0.9 else 0.0
 
         results[key] = {
-            "category": cat,
-            "family": family,
-            "bitrate": bitrate,
-            "detect_acc": det_acc,
+            "category": st["category"],
+            "family": st["family"],
+            "bitrate": st["bitrate"],
+            "detect_acc": detect_acc,
             "det_roc_auc": det_auc,
             "det_tpr_at_001_fpr": det_tpr_001,
             "bit_acc": bit_acc,
@@ -309,10 +351,12 @@ def main():
             "tnr": neg_acc,
         }
 
-    # 8. Assemble Full Validation Report
+    # Quality metrics summary
+    avg_pesq = float(np.mean(pesq_list)) if pesq_list else 0.0
+    avg_stoi = float(np.mean(stoi_list)) if stoi_list else 1.0
     quality_metrics = {
-        "pesq_wb": pesq_score,
-        "stoi": stoi_score,
+        "pesq_wb": avg_pesq,
+        "stoi": avg_stoi,
         "clean_utmos": 0.0,
         "wm_utmos": 0.0,
         "clean_sim": 0.0,
@@ -321,15 +365,16 @@ def main():
         "wm_wer": 0.0,
         "clean_cer": 0.0,
         "wm_cer": 0.0,
-        "embed_overhead_ms_per_sec": (t_embed / max(0.01, duration)) * 1000.0,
-        "detect_latency_ms_per_sec": (total_detect_time / max(0.01, duration * len(val_attacks))) * 1000.0,
+        "embed_overhead_ms_per_sec": (total_embed_time / max(0.01, total_audio_duration)) * 1000.0,
+        "detect_latency_ms_per_sec": (total_detect_time / max(0.01, total_audio_duration * len(val_attacks))) * 1000.0,
     }
 
-    table_str = format_full_validation_table("Pretrained NeuMark-Native", results, quality_metrics=quality_metrics)
+    step_title = f"Pretrained NeuMark-Native ({len(audio_files)} Clean Sample{'s' if len(audio_files) > 1 else ''})"
+    table_str = format_full_validation_table(step_title, results, quality_metrics=quality_metrics)
     print()
     print(table_str, flush=True)
 
-    # Save reports
+    # Save outputs
     report_file = out_dir / "benchmark_report.txt"
     with open(report_file, "w", encoding="utf-8") as f:
         f.write(table_str + "\n")
@@ -339,8 +384,8 @@ def main():
         json.dump(
             {
                 "watermark_model": str(wm_ckpt_path),
-                "input_audio": str(audio_path),
-                "audio_duration_sec": duration,
+                "num_evaluated_audios": len(audio_files),
+                "total_audio_duration_sec": total_audio_duration,
                 "target_bits": msg_str,
                 "quality_metrics": quality_metrics,
                 "attack_results": results,
