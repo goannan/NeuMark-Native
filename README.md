@@ -12,7 +12,8 @@
 Unlike conventional post-hoc audio watermarking that operates on synthesized waveforms, NeuMark-Native embeds covert cryptographic watermark signals directly into discrete latent acoustic tokens during generative synthesis.
 
 - **Interactive Audio Demos**: [https://goannan.github.io/NeuMark-Native/](https://goannan.github.io/NeuMark-Native/)
-- **Pretrained Checkpoint**: `checkpoints/NeuMark-Native.pt` is included directly in this repository for instant verification.
+- **Pretrained Checkpoint**: The trained native watermark model (`checkpoints/NeuMark-Native.pt`, 80.5 MB) is provided directly in this repository.
+- **VALL-E Base Model**: Readers can train the base VALL-E model from scratch using the self-contained recipe in `egs/libritts/`.
 
 ---
 
@@ -100,21 +101,17 @@ curl -L -o models/wavlm_large_finetune.pth \
 
 ---
 
-## Quick Start: Verification with Pretrained Checkpoint
+## Quick Start: Watermark Verification (Pretrained Checkpoint)
 
-The official model **`checkpoints/NeuMark-Native.pt`** (trained for 130k steps on LibriTTS) is included directly in the repo. You can skip training and immediately verify watermark embedding and extraction:
+The official watermark model **`checkpoints/NeuMark-Native.pt`** (trained for 130k steps on LibriTTS) is included directly in the repo. You can immediately verify watermark embedding, extraction accuracy, and channel robustness on discrete acoustic representations without needing to train VALL-E first:
 
 ```bash
 cd egs/libritts
 
-# 1. Zero-shot speech synthesis with 16-bit watermark embedding & extraction
-bash scripts/07_infer_zero_shot.sh \
-    exp/demo_samples \
-    "To be or not to be, that is the question." \
-    ../../docs/audio/libritts_sample_1/00_prompt.wav \
-    "1011001110001101"
+# 1. Verify discrete acoustic token watermark embedding & extraction
+bash scripts/07_infer_zero_shot.sh
 
-# 2. Benchmark robustness evaluation across multiple distortion channels
+# 2. Benchmark robustness evaluation across distortion channels (noise, MP3/AAC, reverb, filtering)
 bash scripts/08_evaluate_watermark.sh \
     data/tokenized_valle_native/cuts_test_valle_native.jsonl.gz \
     checkpoints/NeuMark-Native.pt \
@@ -124,9 +121,9 @@ bash scripts/08_evaluate_watermark.sh \
 
 ---
 
-## Full Training Pipeline (from Scratch)
+## Full Pipeline: Train VALL-E Base Model & End-to-End Inference
 
-All training steps are executed inside `egs/libritts`:
+To synthesize zero-shot voice-cloned speech from arbitrary text prompts, train the VALL-E base model using the recipe below (all steps executed inside `egs/libritts`):
 
 ```bash
 cd egs/libritts
@@ -150,8 +147,16 @@ bash scripts/05_prepare_native_tokens.sh \
     data/tokenized_valle_native \
     -1
 
-# Stage 4: Train native watermark embedder & detector (Accelerate DDP)
+# Stage 4: (Optional) Retrain native watermark model from scratch
+# (You can also skip this and directly use the provided checkpoints/NeuMark-Native.pt)
 bash scripts/06_train_watermark.sh configs/config_tts_native.json
+
+# Stage 5: End-to-end zero-shot TTS synthesis with native watermark embedding
+bash scripts/07_infer_zero_shot.sh \
+    exp/demo_samples \
+    "To be or not to be, that is the question." \
+    ../../docs/audio/libritts_sample_1/00_prompt.wav \
+    "1011001110001101"
 ```
 
 ---
