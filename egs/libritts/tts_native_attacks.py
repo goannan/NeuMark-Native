@@ -399,7 +399,7 @@ def apply_train_augmentation(
     elif attack_name == "volume_duck":
         augmented = AudioEffects.duck_audio(audio, 10)
     elif attack_name == "speed":
-        factor = random.choice([0.9, 1.1])
+        factor = random.uniform(0.8, 1.2)
         augmented = AudioEffects.speed(audio, factor, sample_rate)
     elif attack_name == "encodec_3kbps":
         augmented = EncodecAttack.compress(audio, 3.0, sample_rate)
@@ -431,7 +431,7 @@ def get_validation_attack_suite(sample_rate: int = 16000) -> List[Tuple[str, str
         ("DSP", "Resampling (32k-16k)", "", lambda wav: AudioEffects.updownresample(wav, sample_rate, 32000)),
         ("DSP", "Volume Boost (+10%)", "", lambda wav: AudioEffects.boost_audio(wav, 10)),
         ("DSP", "Volume Duck (-10%)", "", lambda wav: AudioEffects.duck_audio(wav, 10)),
-        ("DSP", "Speed (0.8x-1.2x)", "", lambda wav: AudioEffects.speed(wav, 1.1, sample_rate)),
+        ("DSP", "Speed (0.8x-1.2x)", "", lambda wav: AudioEffects.speed(wav, random.uniform(0.8, 1.2), sample_rate)),
 
         # Codec Attacks
         ("Codec", "Encodec", "3 kbps", lambda wav: EncodecAttack.compress(wav, 3.0, sample_rate)),

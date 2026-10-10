@@ -4,12 +4,17 @@
 
 <p align="center">
   <a href="https://pytorch.org"><img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-2.0%2B-ee4c2c.svg?style=flat&logo=pytorch"></a>
+  <a href="https://arxiv.org/abs/2610.05215"><img alt="arXiv" src="https://img.shields.io/badge/arXiv-2610.05215-b31b1b.svg?style=flat"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat"></a>
   <a href="https://huggingface.co/docs/accelerate/index"><img alt="Accelerate" src="https://img.shields.io/badge/HuggingFace-Accelerate-yellow?style=flat"></a>
   <a href="https://goannan.github.io/NeuMark-Native/"><img alt="Demo Page" src="https://img.shields.io/badge/Audio%20Demo-GitHub%20Pages-blue?style=flat&logo=github"></a>
 </p>
 
 </div>
+
+> **NeuMark-Native: Robust Text-to-Speech-Native Watermarking Through Full Utilization of Neural Audio Codec Latent Space**  
+> Annan Wu, Wen-Chin Huang, Tomoki Toda  
+> Paper: [arXiv:2610.05215](https://arxiv.org/abs/2610.05215)
 
 **NeuMark-Native** is an end-to-end framework integrating zero-shot neural speech synthesis (**VALL-E**) with in-model **native latent audio watermarking**. 
 
@@ -190,6 +195,20 @@ Open `http://localhost:8080` in your browser.
 ---
 
 ## Citation & Acknowledgments
+
+If you find this work useful in your research, please cite:
+
+```bibtex
+@misc{wu2026neumarknativerobusttexttospeechnativewatermarking,
+      title={NeuMark-Native: Robust Text-to-Speech-Native Watermarking Through Full Utilization of Neural Audio Codec Latent Space}, 
+      author={Annan Wu and Wen-Chin Huang and Tomoki Toda},
+      year={2026},
+      eprint={2610.05215},
+      archivePrefix={arXiv},
+      primaryClass={cs.SD},
+      url={https://arxiv.org/abs/2610.05215}, 
+}
+```
 
 This project builds upon:
 - [VALL-E](https://github.com/lifeiteng/valle)
